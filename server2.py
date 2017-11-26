@@ -23,7 +23,11 @@ time = list()
 i = 0
 #############################
 
-
+# Global variables
+notsentlight = True
+notsenttemp = True
+notsenthumid = True
+notsentwoof = True
 
 
 
@@ -31,11 +35,46 @@ class MyHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         global i
+
+        # Read the Content sent from the board #
         msglen = int(self.headers.getheader('content-length'))
     	post_data = self.rfile.read(msglen)
     	data = post_data.split('\n')[0]
     	writer.write(data + "\n")
     	senddata = data.split(';')
+
+        # Notification #
+        global notsentlight, notsenttemp, notsenthumid, notsentwoof
+        tempth = 26
+        lightth = 100
+        humidth = 32
+        report = {}
+    	for j in range(len(senddata)):
+    		report["value" + str(j + 1)] = senddata[j]
+        #requests.post("https://maker.ifttt.com/trigger/mbed_connect/with/key/bBFLD2XKfa7A95eBgmk_XY", data = report)
+
+        #Temperature Notification
+        if float(senddata[0+1]) < tempth and notsenttemp:
+            requests.post("https://maker.ifttt.com/trigger/low_temp/with/key/bBFLD2XKfa7A95eBgmk_XY", data = report)
+            #print "hello"
+            notsenttemp = False
+        #Low Light Notification
+        if float(senddata[4+1]) < lightth and notsentlight:
+            requests.post("https://maker.ifttt.com/trigger/light_sensor/with/key/bBFLD2XKfa7A95eBgmk_XY", data = report)
+            #print "hello"
+            notsentlight = False
+        #Humidity Notification
+        if float(senddata[1+1]) < humidth and notsenthumid:
+            requests.post("https://maker.ifttt.com/trigger/high_humid/with/key/bBFLD2XKfa7A95eBgmk_XY", data = report)
+            #print "hello"
+            notsenthumid = False
+        #Theft Notification & Email to self  (punpun write you triggr condition)
+        if float(senddata[4+1]) < 100 and notsentwoof:
+            requests.post("https://maker.ifttt.com/trigger/accel_thresh/with/key/bBFLD2XKfa7A95eBgmk_XY", data = report)
+            #print "hello"
+            notsentwoof = False
+        # End Notification #
+
 
         print data
 
@@ -45,8 +84,7 @@ class MyHandler(BaseHTTPRequestHandler):
         acc_y = float(senddata[-2])
         acc_z = float(senddata[-1])
 
-        # Acceleration plot
-        ###########
+        # Acceleration & Angle plot #
         acc_x_arr.append(acc_x);
         acc_y_arr.append(acc_y);
         acc_z_arr.append(acc_z);
@@ -54,7 +92,6 @@ class MyHandler(BaseHTTPRequestHandler):
 
         i += 1;
 
-        # Angles #
         roll = math.atan2(acc_y, acc_z) * 180 / math.pi
         pitch = math.atan2(-acc_x, math.sqrt(acc_y*acc_y + acc_z*acc_z)) * 180 / math.pi
         roll_arr.append(roll)
@@ -63,7 +100,6 @@ class MyHandler(BaseHTTPRequestHandler):
         if(mode == "C"):
             print "roll = " + str(roll)
             print "pitch = " + str(pitch)
-        ###########
 
         plt.subplot(3,1,1)
         plt.title("Red = x, Blue = y, Green = z")
@@ -84,7 +120,7 @@ class MyHandler(BaseHTTPRequestHandler):
 
         plt.show()
         plt.pause(0.0001)
-        ###########
+        # End Acceleration & Angle plot #
 
 
         # Security #
@@ -97,6 +133,7 @@ class MyHandler(BaseHTTPRequestHandler):
 
             if(avg_var > 0.1): #this threshold can be anything
                 print "Your bike might be getting stolen!!"
+        # End Security #
 
         print "____________________________________"
 
